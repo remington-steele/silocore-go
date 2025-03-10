@@ -1,7 +1,6 @@
 package router
 
 import (
-	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -44,7 +43,7 @@ func New(opts Options) *chi.Mux {
 
 	if opts.EnableCORS {
 		r.Use(cors.Handler(cors.Options{
-			AllowedOrigins:   []string{"*"}, // For development; restrict in production
+			AllowedOrigins:   []string{"https://*", "http://*"}, // Restrict as needed in configuration
 			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 			AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 			ExposedHeaders:   []string{"Link"},
@@ -52,12 +51,6 @@ func New(opts Options) *chi.Mux {
 			MaxAge:           300, // Maximum value not readily exceeded by browsers
 		}))
 	}
-
-	// Health check endpoint (no auth required)
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
 
 	return r
 }

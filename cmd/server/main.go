@@ -104,17 +104,8 @@ func main() {
 	routerOpts.Dependencies = routerDeps
 	r := router.New(routerOpts)
 
-	// Check if we're in development mode
-	isDev := os.Getenv("ENV") == "development"
-
 	// Register application routes
-	if isDev {
-		log.Println("Running in development mode - authentication disabled")
-		router.RegisterRoutes(r)
-	} else {
-		log.Println("Running in production mode - authentication enabled")
-		router.RegisterRoutesWithAuth(r, routerDeps)
-	}
+	router.RegisterRoutes(r, routerDeps)
 
 	// Get port from environment or use default
 	port := os.Getenv("PORT")

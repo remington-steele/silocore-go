@@ -23,8 +23,8 @@ type RouterDependencies struct {
 	JWTAuthService      *jwt.Service
 }
 
-// RegisterRoutesWithAuth registers all application routes with authentication
-func RegisterRoutesWithAuth(r chi.Router, deps RouterDependencies) {
+// RegisterRoutes registers all application routes with proper authentication and authorization
+func RegisterRoutes(r chi.Router, deps RouterDependencies) {
 	// Create a new router to apply middleware
 	router := chi.NewRouter()
 
@@ -33,33 +33,27 @@ func RegisterRoutesWithAuth(r chi.Router, deps RouterDependencies) {
 		router.Use(deps.Factory.TransactionManager().Middleware())
 	}
 
-	// Register view routes
-	registerViewRoutes(router, deps)
+	// Register public routes (no authentication required)
+	registerPublicRoutes(router, deps)
 
-	// Register API routes
-	router.Route("/api", func(r chi.Router) {
-		// Public routes
-		registerPublicRoutes(r)
+	// Register protected routes (require authentication)
+	router.Group(func(r chi.Router) {
+		// Apply authentication middleware to all routes in this group
+		r.Use(custommw.AuthMiddleware(deps.JWTService))
 
-		// Protected routes (require authentication)
-		r.Group(func(r chi.Router) {
-			// Apply authentication middleware to all routes in this group
-			r.Use(custommw.AuthMiddleware(deps.JWTService))
+		// Apply role middleware to fetch and set user roles
+		r.Use(custommw.RoleMiddleware(deps.UserService))
 
-			// Apply role middleware to fetch and set user roles
-			r.Use(custommw.RoleMiddleware(deps.UserService))
+		// Admin routes
+		registerAdminRoutes(r)
 
-			// Admin routes
-			registerAdminRoutes(r)
+		// Tenant routes
+		registerTenantRoutes(r, deps.UserService)
 
-			// Tenant routes
-			registerTenantRoutes(r, deps.UserService)
-
-			// Order routes
-			if deps.Factory != nil {
-				order.RegisterRoutes(r, deps.Factory)
-			}
-		})
+		// Order routes
+		if deps.Factory != nil {
+			order.RegisterRoutes(r, deps.Factory)
+		}
 	})
 
 	// Serve static files
@@ -70,59 +64,45 @@ func RegisterRoutesWithAuth(r chi.Router, deps RouterDependencies) {
 	r.Mount("/", router)
 }
 
-// RegisterRoutes registers all application routes without authentication (for development/testing)
-func RegisterRoutes(r chi.Router) {
-	// Register view routes (without authentication for development/testing)
-	registerViewRoutes(r, RouterDependencies{})
-
-	// Serve static files
-	fileServer := http.FileServer(http.Dir("./internal/static"))
-	r.Handle("/static/*", http.StripPrefix("/static/", fileServer))
-
-	// Register API routes
-	r.Route("/api", func(r chi.Router) {
-		// Public routes
-		registerPublicRoutes(r)
-
-		// Protected routes (without authentication for development/testing)
-		r.Group(func(r chi.Router) {
-			// Admin routes
-			registerAdminRoutes(r)
-
-			// Tenant routes
-			registerTenantRoutes(r, nil)
-
-			// Order routes (without factory for development/testing)
-			// Note: This won't work without a factory, but is included for completeness
-		})
-	})
-}
-
-// registerViewRoutes registers all view routes
-func registerViewRoutes(r chi.Router, deps RouterDependencies) {
-	// Create a views router with available services
-	// If services are not available, use nil to allow development mode
-	viewsRouter := NewViewsRouter(deps.AuthService, deps.OrderService, deps.RegistrationService, deps.JWTAuthService)
-
-	// Mount the views router
-	r.Mount("/", viewsRouter.Routes())
-}
-
 // registerPublicRoutes registers routes that don't require authentication
-func registerPublicRoutes(r chi.Router) {
-	r.Group(func(r chi.Router) {
-		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("Welcome to SiloCore API"))
-		})
+func registerPublicRoutes(r chi.Router, deps RouterDependencies) {
+	// Home page
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		// This could be a templ template rendering the home page
+		w.Write([]byte("Welcome to SiloCore"))
+	})
 
-		// Auth routes for login, registration, etc.
+	// Authentication routes
+	if deps.AuthService != nil && deps.JWTAuthService != nil {
+		// Create auth router with only the dependencies it needs
+		authRouter := NewAuthRouter(deps.AuthService, deps.RegistrationService, deps.JWTAuthService)
+
+		// Mount auth routes
+		r.Get("/login", authRouter.LoginPage)
+		r.Post("/login", authRouter.HandleLogin)
+		r.Get("/register", authRouter.RegisterPage)
+		r.Post("/register", authRouter.HandleRegister)
+		r.Get("/logout", authRouter.HandleLogout)
+	} else {
+		// Fallback for when services aren't available
+		r.Get("/login", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("Login Page"))
+		})
 		r.Post("/login", func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("Login endpoint"))
+			w.Write([]byte("Login Handler"))
 		})
-
+		r.Get("/register", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("Register Page"))
+		})
 		r.Post("/register", func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("Register endpoint"))
+			w.Write([]byte("Register Handler"))
 		})
+	}
+
+	// Health check endpoint
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
 	})
 }
 
@@ -132,57 +112,33 @@ func registerAdminRoutes(r chi.Router) {
 		// Apply admin middleware to all routes in this group
 		r.Use(custommw.RequireAdmin)
 
-		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("Admin Dashboard"))
-		})
+		// Create admin router with only the dependencies it needs
+		adminRouter := NewAdminRouter()
+
+		// Dashboard
+		r.Get("/", adminRouter.Dashboard)
 
 		// Tenant management
 		r.Route("/tenants", func(r chi.Router) {
-			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				w.Write([]byte("List of all tenants"))
-			})
-
-			r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-				w.Write([]byte("Create new tenant"))
-			})
+			r.Get("/", adminRouter.ListTenants)
+			r.Post("/", adminRouter.CreateTenant)
 
 			r.Route("/{tenantID}", func(r chi.Router) {
-				r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-					w.Write([]byte("Get tenant details"))
-				})
-
-				r.Put("/", func(w http.ResponseWriter, r *http.Request) {
-					w.Write([]byte("Update tenant"))
-				})
-
-				r.Delete("/", func(w http.ResponseWriter, r *http.Request) {
-					w.Write([]byte("Delete tenant"))
-				})
+				r.Get("/", adminRouter.GetTenant)
+				r.Put("/", adminRouter.UpdateTenant)
+				r.Delete("/", adminRouter.DeleteTenant)
 			})
 		})
 
 		// User management
 		r.Route("/users", func(r chi.Router) {
-			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				w.Write([]byte("List of all users"))
-			})
-
-			r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-				w.Write([]byte("Create new user"))
-			})
+			r.Get("/", adminRouter.ListUsers)
+			r.Post("/", adminRouter.CreateUser)
 
 			r.Route("/{userID}", func(r chi.Router) {
-				r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-					w.Write([]byte("Get user details"))
-				})
-
-				r.Put("/", func(w http.ResponseWriter, r *http.Request) {
-					w.Write([]byte("Update user"))
-				})
-
-				r.Delete("/", func(w http.ResponseWriter, r *http.Request) {
-					w.Write([]byte("Delete user"))
-				})
+				r.Get("/", adminRouter.GetUser)
+				r.Put("/", adminRouter.UpdateUser)
+				r.Delete("/", adminRouter.DeleteUser)
 			})
 		})
 	})
@@ -194,58 +150,40 @@ func registerTenantRoutes(r chi.Router, userService custommw.UserService) {
 		// Apply tenant context middleware to all routes in this group
 		r.Use(custommw.RequireTenantContext)
 
-		// If userService is provided (in auth mode), require tenant membership
+		// If userService is provided, require tenant membership
 		if userService != nil {
 			r.Use(custommw.RequireTenantMember(userService))
 		}
 
-		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("Tenant Dashboard"))
-		})
+		// Create tenant router with only the dependencies it needs
+		tenantRouter := NewTenantRouter(userService)
+
+		// Dashboard
+		r.Get("/", tenantRouter.Dashboard)
 
 		// Tenant profile
 		r.Route("/profile", func(r chi.Router) {
-			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				w.Write([]byte("Get tenant profile"))
-			})
-
-			r.Put("/", func(w http.ResponseWriter, r *http.Request) {
-				w.Write([]byte("Update tenant profile"))
-			})
+			r.Get("/", tenantRouter.GetProfile)
+			r.Put("/", tenantRouter.UpdateProfile)
 		})
 
 		// Tenant members
 		r.Route("/members", func(r chi.Router) {
-			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				w.Write([]byte("List tenant members"))
-			})
-
-			r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-				w.Write([]byte("Add tenant member"))
-			})
+			r.Get("/", tenantRouter.ListMembers)
+			r.Post("/", tenantRouter.AddMember)
 
 			// Tenant super routes
 			r.Route("/admin", func(r chi.Router) {
 				// Apply tenant super middleware
 				r.Use(custommw.RequireTenantSuper)
 
-				r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-					w.Write([]byte("Tenant Admin Dashboard"))
-				})
+				r.Get("/", tenantRouter.AdminDashboard)
 			})
 
 			r.Route("/{memberID}", func(r chi.Router) {
-				r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-					w.Write([]byte("Get member details"))
-				})
-
-				r.Put("/", func(w http.ResponseWriter, r *http.Request) {
-					w.Write([]byte("Update member"))
-				})
-
-				r.Delete("/", func(w http.ResponseWriter, r *http.Request) {
-					w.Write([]byte("Remove member"))
-				})
+				r.Get("/", tenantRouter.GetMember)
+				r.Put("/", tenantRouter.UpdateMember)
+				r.Delete("/", tenantRouter.RemoveMember)
 			})
 		})
 	})
