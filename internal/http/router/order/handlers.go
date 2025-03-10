@@ -9,7 +9,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	authctx "github.com/unsavory/silocore-go/internal/auth/context"
+	ordermodel "github.com/unsavory/silocore-go/internal/order"
 	orderservice "github.com/unsavory/silocore-go/internal/order/service"
+	"github.com/unsavory/silocore-go/internal/views/pages"
 )
 
 // Handler handles HTTP requests for orders
@@ -355,4 +357,45 @@ func (h *Handler) CountOrders(w http.ResponseWriter, r *http.Request) {
 	// Return count as JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]int{"count": count})
+}
+
+// OrdersPage handles GET /orders/view and renders the orders page
+func (h *Handler) OrdersPage(w http.ResponseWriter, r *http.Request) {
+	// Verify tenant context
+	tenantID, err := authctx.GetTenantID(r.Context())
+	if err != nil || tenantID == nil {
+		http.Error(w, "Tenant context required", http.StatusForbidden)
+		return
+	}
+
+	// Get orders from service
+	serviceOrders, err := h.orderService.ListOrders(r.Context(), orderservice.OrderFilter{})
+	if err != nil {
+		log.Printf("Error fetching orders: %v", err)
+		http.Error(w, "Failed to fetch orders", http.StatusInternalServerError)
+		return
+	}
+
+	// Convert service orders to view model orders
+	viewOrders := make([]ordermodel.Order, len(serviceOrders))
+	for i, svcOrder := range serviceOrders {
+		viewOrders[i] = ordermodel.Order{
+			ID:        strconv.FormatInt(svcOrder.ID, 10),
+			TenantID:  strconv.FormatInt(svcOrder.TenantID, 10),
+			UserID:    strconv.FormatInt(svcOrder.UserID, 10),
+			Status:    svcOrder.Status,
+			Total:     svcOrder.TotalAmount,
+			CreatedAt: svcOrder.CreatedAt,
+			UpdatedAt: svcOrder.UpdatedAt,
+		}
+	}
+
+	// Create page data
+	data := pages.OrdersPageData{
+		Orders: viewOrders,
+	}
+
+	// Render the page
+	component := pages.Orders(data)
+	component.Render(r.Context(), w)
 }

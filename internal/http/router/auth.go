@@ -94,8 +94,8 @@ func (ar *AuthRouter) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
 
-	// Redirect to home page
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	// Redirect to orders page instead of home page
+	http.Redirect(w, r, "/orders", http.StatusSeeOther)
 }
 
 // RegisterPage renders the registration page

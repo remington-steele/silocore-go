@@ -33,23 +33,29 @@ func RegisterRoutes(r chi.Router, factory *service.Factory) {
 		r.Use(middleware.RoleMiddleware(factory.UserService()))
 		r.Use(middleware.RequireTenantContext)
 
-		// GET /orders
-		r.Get("/", orderRouter.handler.ListOrders)
+		// GET /orders - View page
+		r.Get("/", orderRouter.handler.OrdersPage)
 
-		// GET /orders/count
-		r.Get("/count", orderRouter.handler.CountOrders)
+		// API routes
+		r.Route("/api", func(r chi.Router) {
+			// GET /orders/api
+			r.Get("/", orderRouter.handler.ListOrders)
 
-		// POST /orders
-		r.Post("/", orderRouter.handler.CreateOrder)
+			// GET /orders/api/count
+			r.Get("/count", orderRouter.handler.CountOrders)
 
-		// GET /orders/{id}
-		r.Get("/{id}", orderRouter.handler.GetOrder)
+			// POST /orders/api
+			r.Post("/", orderRouter.handler.CreateOrder)
 
-		// PUT /orders/{id}
-		r.Put("/{id}", orderRouter.handler.UpdateOrder)
+			// GET /orders/api/{id}
+			r.Get("/{id}", orderRouter.handler.GetOrder)
 
-		// DELETE /orders/{id}
-		r.Delete("/{id}", orderRouter.handler.DeleteOrder)
+			// PUT /orders/api/{id}
+			r.Put("/{id}", orderRouter.handler.UpdateOrder)
+
+			// DELETE /orders/api/{id}
+			r.Delete("/{id}", orderRouter.handler.DeleteOrder)
+		})
 	})
 
 	// Register user orders route

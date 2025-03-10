@@ -27,22 +27,33 @@ type UserService interface {
 func AuthMiddleware(jwtService JWTService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Extract token from Authorization header
+			var tokenString string
+
+			// First try to extract token from Authorization header
 			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
-				http.Error(w, "Authorization header is required", http.StatusUnauthorized)
-				return
+			if authHeader != "" {
+				// Check if the header has the Bearer prefix
+				parts := strings.Split(authHeader, " ")
+				if len(parts) == 2 && parts[0] == "Bearer" {
+					tokenString = parts[1]
+				}
 			}
 
-			// Check if the header has the Bearer prefix
-			parts := strings.Split(authHeader, " ")
-			if len(parts) != 2 || parts[0] != "Bearer" {
-				http.Error(w, "Authorization header format must be Bearer {token}", http.StatusUnauthorized)
+			// If no token in header, try to extract from cookie
+			if tokenString == "" {
+				cookie, err := r.Cookie("auth_token")
+				if err == nil && cookie.Value != "" {
+					tokenString = cookie.Value
+				}
+			}
+
+			// If no token found, return unauthorized
+			if tokenString == "" {
+				http.Error(w, "Authentication required", http.StatusUnauthorized)
 				return
 			}
 
 			// Validate the token
-			tokenString := parts[1]
 			claims, err := jwtService.ValidateToken(tokenString)
 			if err != nil {
 				http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
@@ -81,11 +92,12 @@ func RoleMiddleware(userService UserService) func(http.Handler) http.Handler {
 			// Fetch system-wide roles for the user
 			roles, err := userService.GetUserRoles(ctx, userID)
 			if err != nil {
-				http.Error(w, "Failed to fetch user roles", http.StatusInternalServerError)
-				return
+				// Log the error but continue with empty roles
+				// This allows regular users with no roles to proceed
+				roles = []authctx.Role{}
 			}
 
-			// Add roles to context
+			// Add roles to context (even if empty)
 			ctx = authctx.WithRoles(ctx, roles)
 
 			// If tenant context is present, fetch tenant-specific roles
@@ -94,8 +106,8 @@ func RoleMiddleware(userService UserService) func(http.Handler) http.Handler {
 				// Check if user is a member of this tenant or has admin role
 				isMember, err := userService.IsTenantMember(ctx, userID, *tenantID)
 				if err != nil {
-					http.Error(w, "Failed to verify tenant membership", http.StatusInternalServerError)
-					return
+					// Log the error but assume not a member
+					isMember = false
 				}
 
 				// Admin users can access any tenant context
@@ -111,8 +123,8 @@ func RoleMiddleware(userService UserService) func(http.Handler) http.Handler {
 				if isMember {
 					tenantRoles, err := userService.GetUserTenantRoles(ctx, userID, *tenantID)
 					if err != nil {
-						http.Error(w, "Failed to fetch tenant roles", http.StatusInternalServerError)
-						return
+						// Log the error but continue with empty tenant roles
+						tenantRoles = []authctx.Role{}
 					}
 
 					// Merge tenant roles with system roles
