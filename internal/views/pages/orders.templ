@@ -1,0 +1,114 @@
+package pages
+
+import (
+	"github.com/unsavory/silocore-go/internal/views/layouts"
+	"github.com/unsavory/silocore-go/internal/order"
+	"time"
+	"fmt"
+)
+
+type OrdersPageData struct {
+	Orders []order.Order
+	User   struct {
+		Name string
+	}
+}
+
+templ Orders(data OrdersPageData) {
+	@layouts.Base("Order History") {
+		<div class="mb-6">
+			<h1 class="text-2xl font-bold text-gray-800">Order History</h1>
+			<p class="text-gray-600">View and manage your orders</p>
+		</div>
+
+		if len(data.Orders) == 0 {
+			<div class="card text-center py-12">
+				<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+				</svg>
+				<h3 class="mt-2 text-lg font-medium text-gray-900">No orders found</h3>
+				<p class="mt-1 text-sm text-gray-500">You haven't placed any orders yet.</p>
+				<div class="mt-6">
+					<a href="/products" class="btn-primary">Browse Products</a>
+				</div>
+			</div>
+		} else {
+			<div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+				<table class="min-w-full divide-y divide-gray-300">
+					<thead class="bg-gray-50">
+						<tr>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Order ID</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Date</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Total</th>
+							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+								<span class="sr-only">Actions</span>
+							</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-gray-200 bg-white">
+						for _, order := range data.Orders {
+							@OrderRow(order)
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	}
+}
+
+templ OrderRow(order order.Order) {
+	<tr>
+		<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">{ order.ID }</td>
+		<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{ formatDate(order.CreatedAt) }</td>
+		<td class="whitespace-nowrap px-3 py-4 text-sm">
+			@OrderStatus(order.Status)
+		</td>
+		<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">${ fmt.Sprintf("%.2f", order.Total) }</td>
+		<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+			<a 
+				href={ templ.SafeURL("/orders/" + order.ID) } 
+				class="text-primary-600 hover:text-primary-900"
+				hx-get={ "/orders/" + order.ID }
+				hx-target="#order-details"
+				hx-trigger="click"
+				hx-swap="innerHTML"
+			>
+				View<span class="sr-only">, order { order.ID }</span>
+			</a>
+		</td>
+	</tr>
+}
+
+templ OrderStatus(status string) {
+	switch status {
+		case "pending":
+			<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+				Pending
+			</span>
+		case "processing":
+			<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+				Processing
+			</span>
+		case "shipped":
+			<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+				Shipped
+			</span>
+		case "delivered":
+			<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+				Delivered
+			</span>
+		case "cancelled":
+			<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+				Cancelled
+			</span>
+		default:
+			<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+				{ status }
+			</span>
+	}
+}
+
+func formatDate(date time.Time) string {
+	return date.Format("Jan 02, 2006")
+} 

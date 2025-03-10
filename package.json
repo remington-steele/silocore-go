@@ -1,0 +1,13 @@
+{
+  "name": "silocore-go",
+  "version": "1.0.0",
+  "description": "A multi-tenant SAAS application",
+  "scripts": {
+    "build:css": "bin/tailwindcss -i ./internal/static/css/input.css -o ./internal/static/css/output.css --minify",
+    "watch:css": "bin/tailwindcss -i ./internal/static/css/input.css -o ./internal/static/css/output.css --watch",
+    "build:templ": "templ generate",
+    "watch:templ": "templ generate --watch",
+    "build": "npm run build:css && npm run build:templ",
+    "dev": "concurrently \"npm run watch:css\" \"npm run watch:templ\""
+  }
+} 

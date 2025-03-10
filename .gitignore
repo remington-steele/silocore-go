@@ -1,0 +1,15 @@
+.env
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+.idea/
+.vscode/
+*.iml
+.DS_Store
+vendor/
+tmp/

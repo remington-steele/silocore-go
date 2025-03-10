@@ -1,0 +1,31 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+# Build the app
+cmd = "templ generate && go build -o ./tmp/app ./cmd/server"
+bin = "tmp/app"
+full_bin = "./tmp/app"
+
+# Watch these file extensions
+include_ext = ["go", "templ"]
+exclude_dir = ["tmp", "vendor"]
+exclude_file = []
+include_dir = []
+
+# Don't watch generated files
+exclude_regex = ["_templ\\.go$"]
+delay = 1000 # ms
+stop_on_error = true
+
+[log]
+time = true
+
+[color]
+main = "magenta"
+watcher = "cyan"
+build = "yellow"
+runner = "green"
+
+[misc]
+clean_on_exit = true 
