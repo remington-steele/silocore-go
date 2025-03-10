@@ -1,6 +1,6 @@
 # Silocore Go
 
-A multi-tenant SAAS application using Go, Chi, go-migrate, templ templates, HTMX, Tailwind CSS, Docker, and Postgres.
+A multi-tenant SAAS application stack using Go, Chi, go-migrate, templ templates, HTMX, Tailwind CSS, Docker, and Postgres.
 
 ## Features
 
