@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 
 	authctx "github.com/unsavory/silocore-go/internal/auth/context"
 )
@@ -14,6 +15,15 @@ var (
 	ErrDBOperation  = errors.New("database operation failed")
 )
 
+// User represents a user in the system
+type User struct {
+	ID           int64
+	Email        string
+	FirstName    string
+	LastName     string
+	PasswordHash string
+}
+
 // UserService defines the interface for user-related operations
 type UserService interface {
 	// GetUserRoles retrieves all roles for a user, both system-wide and tenant-specific
@@ -22,8 +32,8 @@ type UserService interface {
 	// GetUserTenantRoles retrieves tenant-specific roles for a user
 	GetUserTenantRoles(ctx context.Context, userID int64, tenantID int64) ([]authctx.Role, error)
 
-	// IsTenantMember checks if a user is a member of a specific tenant
-	IsTenantMember(ctx context.Context, userID int64, tenantID int64) (bool, error)
+	// GetUserByEmail retrieves a user by their email address
+	GetUserByEmail(ctx context.Context, email string) (*User, error)
 }
 
 // DBUserService implements UserService using a database
@@ -34,6 +44,34 @@ type DBUserService struct {
 // NewDBUserService creates a new DBUserService
 func NewDBUserService(db *sql.DB) *DBUserService {
 	return &DBUserService{db: db}
+}
+
+// GetUserByEmail retrieves a user by their email address
+func (s *DBUserService) GetUserByEmail(ctx context.Context, email string) (*User, error) {
+	query := `
+		SELECT user_id, email, first_name, last_name, password_hash
+		FROM usr
+		WHERE email = $1
+	`
+
+	var user User
+	err := s.db.QueryRowContext(ctx, query, email).Scan(
+		&user.ID,
+		&user.Email,
+		&user.FirstName,
+		&user.LastName,
+		&user.PasswordHash,
+	)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrUserNotFound
+		}
+		log.Printf("[ERROR] Database error when getting user by email %s: %v", email, err)
+		return nil, ErrDBOperation
+	}
+
+	return &user, nil
 }
 
 // GetUserRoles retrieves all system-wide roles for a user
@@ -63,6 +101,10 @@ func (s *DBUserService) GetUserRoles(ctx context.Context, userID int64) ([]authc
 
 	if err := rows.Err(); err != nil {
 		return nil, ErrDBOperation
+	}
+
+	if len(roles) == 0 {
+		log.Printf("[INFO] No roles found for user ID %d", userID)
 	}
 
 	return roles, nil
@@ -97,24 +139,9 @@ func (s *DBUserService) GetUserTenantRoles(ctx context.Context, userID int64, te
 		return nil, ErrDBOperation
 	}
 
-	return roles, nil
-}
-
-// IsTenantMember checks if a user is a member of a specific tenant
-func (s *DBUserService) IsTenantMember(ctx context.Context, userID int64, tenantID int64) (bool, error) {
-	// Query to check if user is a member of the tenant
-	query := `
-		SELECT EXISTS(
-			SELECT 1 FROM tenant_member 
-			WHERE user_id = $1 AND tenant_id = $2
-		)
-	`
-
-	var isMember bool
-	err := s.db.QueryRowContext(ctx, query, userID, tenantID).Scan(&isMember)
-	if err != nil {
-		return false, ErrDBOperation
+	if len(roles) == 0 {
+		log.Printf("[INFO] No tenant roles found for user ID %d in tenant ID %d", userID, tenantID)
 	}
 
-	return isMember, nil
+	return roles, nil
 }

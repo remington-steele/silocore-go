@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"testing"
 	"time"
 
@@ -32,21 +31,10 @@ func createContextWithTenant(tenantID int64) context.Context {
 func setupTransaction(ctx context.Context, mock sqlmock.Sqlmock) context.Context {
 	// We don't need to create a real transaction, just mock the expectations
 	// The actual transaction will be created by the service when it calls Begin
-	mock.ExpectBegin()
+	mockTx := mock.ExpectBegin()
 
-	// Create a mock transaction
-	db, err := sql.Open("sqlmock", "sqlmock_db")
-	if err != nil {
-		panic(fmt.Sprintf("Failed to open mock DB: %v", err))
-	}
-
-	tx, err := db.Begin()
-	if err != nil {
-		panic(fmt.Sprintf("Failed to begin transaction: %v", err))
-	}
-
-	// Add the transaction to the context
-	return context.WithValue(ctx, transaction.TxKey, tx)
+	// Use the mock transaction directly
+	return context.WithValue(ctx, transaction.TxKey, mockTx)
 }
 
 func TestGetOrder(t *testing.T) {

@@ -1,10 +1,10 @@
 SET ROLE silocore_admin;
 
 -- Create a table for orders
-CREATE TABLE "order" (
-    order_id SERIAL PRIMARY KEY,
-    tenant_id INTEGER NOT NULL REFERENCES tenant(tenant_id) ON DELETE CASCADE,
-    user_id INTEGER NOT NULL REFERENCES usr(user_id) ON DELETE CASCADE,
+CREATE TABLE ordr (
+    id SERIAL PRIMARY KEY,
+    tenant_id INTEGER NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES usr(id) ON DELETE CASCADE,
     order_number VARCHAR(64) NOT NULL,
     status VARCHAR(64) NOT NULL CHECK (status IN ('pending', 'processing', 'completed', 'cancelled')),
     total_amount DECIMAL(10, 2) NOT NULL,
@@ -15,22 +15,22 @@ CREATE TABLE "order" (
 );
 
 -- Create a trigger to automatically update the updated_at column
-CREATE TRIGGER update_order_updated_at
-BEFORE UPDATE ON "order"
+CREATE TRIGGER update_ordr_updated_at
+BEFORE UPDATE ON ordr
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();
 
--- Enable Row Level Security on order table
-ALTER TABLE "order" ENABLE ROW LEVEL SECURITY;
+-- Enable Row Level Security on ordr table
+ALTER TABLE ordr ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policy for order table
+-- Create RLS policy for ordr table
 DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_policies 
-        WHERE tablename = 'order' AND policyname = 'order_isolation_policy'
+        WHERE tablename = 'ordr' AND policyname = 'ordr_isolation_policy'
     ) THEN
-        CREATE POLICY order_isolation_policy ON "order"
+        CREATE POLICY ordr_isolation_policy ON ordr
         USING (
             tenant_id = tenant_context() 
             OR 
@@ -41,7 +41,7 @@ END
 $$;
 
 -- Create indexes for better performance
-CREATE INDEX idx_order_tenant_id ON "order" (tenant_id);
-CREATE INDEX idx_order_user_id ON "order" (user_id);
-CREATE INDEX idx_order_status ON "order" (status);
-CREATE INDEX idx_order_created_at ON "order" (created_at); 
+CREATE INDEX idx_ordr_tenant_id ON ordr (tenant_id);
+CREATE INDEX idx_ordr_user_id ON ordr (user_id);
+CREATE INDEX idx_ordr_status ON ordr (status);
+CREATE INDEX idx_ordr_created_at ON ordr (created_at); 

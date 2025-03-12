@@ -20,7 +20,7 @@ BEGIN
     ) THEN
         CREATE POLICY tenant_isolation_policy ON tenant
         USING (
-            tenant_id = tenant_context() 
+            id = tenant_context() 
             OR 
             tenant_context() IS NULL
         );

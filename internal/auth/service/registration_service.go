@@ -3,13 +3,11 @@ package service
 import (
 	"context"
 	"crypto/rand"
-	"crypto/subtle"
 	"database/sql"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
 	"golang.org/x/crypto/scrypt"
@@ -18,17 +16,7 @@ import (
 // Registration errors
 var (
 	ErrEmailAlreadyExists = errors.New("email already exists")
-	ErrPasswordTooWeak    = errors.New("password is too weak")
 	ErrRegistrationFailed = errors.New("registration failed")
-)
-
-// Scrypt parameters
-const (
-	ScryptN      = 32768 // CPU/memory cost parameter (power of 2)
-	ScryptR      = 8     // Block size parameter
-	ScryptP      = 1     // Parallelization parameter
-	ScryptKeyLen = 32    // Key length
-	SaltSize     = 16    // Salt size in bytes
 )
 
 // RegistrationService defines the interface for user registration
@@ -59,6 +47,11 @@ func (s *DBRegistrationService) RegisterUser(ctx context.Context, firstName, las
 
 	if exists {
 		return 0, ErrEmailAlreadyExists
+	}
+
+	// Validate password
+	if err := ValidatePassword(password); err != nil {
+		return 0, err
 	}
 
 	// Generate a random salt
@@ -113,46 +106,4 @@ func (s *DBRegistrationService) RegisterUser(ctx context.Context, firstName, las
 	}
 
 	return userID, nil
-}
-
-// ValidatePassword checks if a password meets the minimum requirements
-func ValidatePassword(password string) error {
-	if len(password) < 8 {
-		return ErrPasswordTooWeak
-	}
-
-	// Additional password strength checks could be added here
-	// For example, requiring a mix of uppercase, lowercase, numbers, and special characters
-
-	return nil
-}
-
-// VerifyPassword verifies a password against a stored hash
-// This is useful for login functionality
-func VerifyPassword(storedHash, password string) (bool, error) {
-	// Split the stored hash into salt and hash components
-	parts := strings.Split(storedHash, ":")
-	if len(parts) != 2 {
-		return false, errors.New("invalid hash format")
-	}
-
-	// Decode the salt and hash
-	salt, err := base64.StdEncoding.DecodeString(parts[0])
-	if err != nil {
-		return false, fmt.Errorf("error decoding salt: %w", err)
-	}
-
-	storedHashBytes, err := base64.StdEncoding.DecodeString(parts[1])
-	if err != nil {
-		return false, fmt.Errorf("error decoding hash: %w", err)
-	}
-
-	// Hash the provided password with the same salt
-	hashedPassword, err := scrypt.Key([]byte(password), salt, ScryptN, ScryptR, ScryptP, ScryptKeyLen)
-	if err != nil {
-		return false, fmt.Errorf("error hashing password: %w", err)
-	}
-
-	// Compare the hashes in constant time to prevent timing attacks
-	return subtle.ConstantTimeCompare(storedHashBytes, hashedPassword) == 1, nil
 }

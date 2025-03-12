@@ -30,7 +30,7 @@ func RegisterRoutes(r chi.Router, factory *service.Factory) {
 		// in the router hierarchy, but we include them here for completeness
 		// and to ensure proper security even if the parent router changes
 		r.Use(middleware.AuthMiddleware(factory.JWTService()))
-		r.Use(middleware.RoleMiddleware(factory.UserService()))
+		r.Use(middleware.RoleMiddleware(factory.UserService(), factory.TenantMemberService()))
 		r.Use(middleware.RequireTenantContext)
 
 		// GET /orders - View page
@@ -62,7 +62,7 @@ func RegisterRoutes(r chi.Router, factory *service.Factory) {
 	r.Route("/users/{id}/orders", func(r chi.Router) {
 		// Apply middleware
 		r.Use(middleware.AuthMiddleware(factory.JWTService()))
-		r.Use(middleware.RoleMiddleware(factory.UserService()))
+		r.Use(middleware.RoleMiddleware(factory.UserService(), factory.TenantMemberService()))
 		r.Use(middleware.RequireTenantContext)
 
 		// GET /users/{id}/orders

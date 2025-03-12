@@ -25,7 +25,8 @@ type Factory struct {
 	jwtService          *jwt.Service
 
 	// Tenant services
-	tenantService tenantservice.TenantService
+	tenantService       tenantservice.TenantService
+	tenantMemberService tenantservice.TenantMemberService
 
 	// Order services
 	orderService orderservice.OrderService
@@ -42,9 +43,6 @@ func NewFactory(db *sql.DB, jwtConfig jwt.Config) *Factory {
 	// Create user service
 	userService := authservice.NewDBUserService(db)
 
-	// Create auth service
-	authService := authservice.NewDefaultAuthService(userService, jwtService)
-
 	// Create role service
 	roleService := authservice.NewDBRoleService(db)
 
@@ -53,6 +51,12 @@ func NewFactory(db *sql.DB, jwtConfig jwt.Config) *Factory {
 
 	// Create tenant service
 	tenantService := tenantservice.NewDBTenantService(db)
+
+	// Create tenant member service
+	tenantMemberService := tenantservice.NewDBTenantMemberService(db)
+
+	// Create auth service
+	authService := authservice.NewDefaultAuthService(userService, tenantMemberService, jwtService)
 
 	// Create order service
 	orderService := orderservice.NewDBOrderService(db)
@@ -66,6 +70,7 @@ func NewFactory(db *sql.DB, jwtConfig jwt.Config) *Factory {
 		registrationService: registrationService,
 		jwtService:          jwtService,
 		tenantService:       tenantService,
+		tenantMemberService: tenantMemberService,
 		orderService:        orderService,
 	}
 }
@@ -98,6 +103,11 @@ func (f *Factory) JWTService() *jwt.Service {
 // TenantService returns the tenant service
 func (f *Factory) TenantService() tenantservice.TenantService {
 	return f.tenantService
+}
+
+// TenantMemberService returns the tenant member service
+func (f *Factory) TenantMemberService() tenantservice.TenantMemberService {
+	return f.tenantMemberService
 }
 
 // OrderService returns the order service

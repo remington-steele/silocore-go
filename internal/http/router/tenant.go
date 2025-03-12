@@ -3,16 +3,16 @@ package router
 import (
 	"net/http"
 
-	custommw "github.com/unsavory/silocore-go/internal/http/middleware"
+	authservice "github.com/unsavory/silocore-go/internal/auth/service"
 )
 
 // TenantRouter handles tenant-related routes
 type TenantRouter struct {
-	userService custommw.UserService
+	userService authservice.UserService
 }
 
 // NewTenantRouter creates a new TenantRouter with the required dependencies
-func NewTenantRouter(userService custommw.UserService) *TenantRouter {
+func NewTenantRouter(userService authservice.UserService) *TenantRouter {
 	return &TenantRouter{
 		userService: userService,
 	}

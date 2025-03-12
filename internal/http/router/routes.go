@@ -10,17 +10,19 @@ import (
 	"github.com/unsavory/silocore-go/internal/http/router/order"
 	orderservice "github.com/unsavory/silocore-go/internal/order/service"
 	"github.com/unsavory/silocore-go/internal/service"
+	tenantservice "github.com/unsavory/silocore-go/internal/tenant/service"
 )
 
 // RouterDependencies contains all dependencies needed for the router
 type RouterDependencies struct {
 	Factory             *service.Factory
 	JWTService          custommw.JWTService
-	UserService         custommw.UserService
+	UserService         authservice.UserService
 	AuthService         authservice.AuthService
 	OrderService        orderservice.OrderService
 	RegistrationService authservice.RegistrationService
 	JWTAuthService      *jwt.Service
+	TenantMemberService tenantservice.TenantMemberService
 }
 
 // RegisterRoutes registers all application routes with proper authentication and authorization
@@ -42,13 +44,13 @@ func RegisterRoutes(r chi.Router, deps RouterDependencies) {
 		r.Use(custommw.AuthMiddleware(deps.JWTService))
 
 		// Apply role middleware to fetch and set user roles
-		r.Use(custommw.RoleMiddleware(deps.UserService))
+		r.Use(custommw.RoleMiddleware(deps.UserService, deps.TenantMemberService))
 
 		// Admin routes
 		registerAdminRoutes(r)
 
 		// Tenant routes
-		registerTenantRoutes(r, deps.UserService)
+		registerTenantRoutes(r, deps.UserService, deps.TenantMemberService)
 
 		// Order routes
 		if deps.Factory != nil {
@@ -56,11 +58,7 @@ func RegisterRoutes(r chi.Router, deps RouterDependencies) {
 		}
 	})
 
-	// Serve static files
-	fileServer := http.FileServer(http.Dir("./internal/static"))
-	router.Handle("/static/*", http.StripPrefix("/static/", fileServer))
-
-	// Mount the router with middleware to the parent router
+	// Mount the router
 	r.Mount("/", router)
 }
 
@@ -145,14 +143,14 @@ func registerAdminRoutes(r chi.Router) {
 }
 
 // registerTenantRoutes registers routes that require tenant context
-func registerTenantRoutes(r chi.Router, userService custommw.UserService) {
+func registerTenantRoutes(r chi.Router, userService authservice.UserService, tenantMemberService tenantservice.TenantMemberService) {
 	r.Route("/tenant", func(r chi.Router) {
 		// Apply tenant context middleware to all routes in this group
 		r.Use(custommw.RequireTenantContext)
 
-		// If userService is provided, require tenant membership
-		if userService != nil {
-			r.Use(custommw.RequireTenantMember(userService))
+		// If tenantMemberService is provided, require tenant membership
+		if tenantMemberService != nil {
+			r.Use(custommw.RequireTenantMember(tenantMemberService))
 		}
 
 		// Create tenant router with only the dependencies it needs

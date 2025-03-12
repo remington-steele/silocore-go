@@ -88,6 +88,9 @@ func main() {
 	// Initialize registration service
 	registrationService := serviceFactory.RegistrationService()
 
+	// Initialize tenant member service
+	tenantMemberService := serviceFactory.TenantMemberService()
+
 	// Create router dependencies
 	routerDeps := router.RouterDependencies{
 		Factory:             serviceFactory,
@@ -97,6 +100,7 @@ func main() {
 		OrderService:        orderService,
 		RegistrationService: registrationService,
 		JWTAuthService:      jwtService,
+		TenantMemberService: tenantMemberService,
 	}
 
 	// Initialize Chi router with default options and dependencies

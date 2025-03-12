@@ -3,7 +3,7 @@ SET ROLE silocore_admin;
 
 -- Create a table for our tenants
 CREATE TABLE tenant (
-    tenant_id SERIAL PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(255) UNIQUE NOT NULL,
     status VARCHAR(64) NOT NULL CHECK (status IN ('active', 'suspended', 'disabled')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -12,7 +12,7 @@ CREATE TABLE tenant (
 
 -- Create a table for users of the platform
 CREATE TABLE usr (
-    user_id SERIAL PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE CHECK (email <> ''),
     password_hash VARCHAR(255) NOT NULL CHECK (password_hash <> ''),
     first_name VARCHAR(255) NOT NULL CHECK (first_name <> ''),
@@ -24,15 +24,15 @@ CREATE TABLE usr (
 
 -- Create a table for system roles
 CREATE TABLE role (
-    role_id SERIAL PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(64) NOT NULL UNIQUE,
     description TEXT NOT NULL
 );
 
 -- Create a table to link users to roles at the platform level
 CREATE TABLE user_role (
-    user_id INTEGER NOT NULL REFERENCES usr(user_id) ON DELETE CASCADE,
-    role_id INTEGER NOT NULL REFERENCES role(role_id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES usr(id) ON DELETE CASCADE,
+    role_id INTEGER NOT NULL REFERENCES role(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (user_id, role_id)
 );
@@ -40,8 +40,8 @@ CREATE INDEX user_role_role_id_idx ON user_role(role_id);
 
 -- Create a table to map users to tenants
 CREATE TABLE tenant_member (
-    tenant_id INTEGER NOT NULL REFERENCES tenant(tenant_id) ON DELETE CASCADE,
-    user_id INTEGER NOT NULL REFERENCES usr(user_id) ON DELETE CASCADE,
+    tenant_id INTEGER NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES usr(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (tenant_id, user_id)
 );
@@ -49,9 +49,9 @@ CREATE INDEX tenant_member_user_id_idx ON tenant_member(user_id);
 
 -- Create a table to map users to tenants and roles
 CREATE TABLE tenant_role (
-    tenant_id INTEGER NOT NULL REFERENCES tenant(tenant_id) ON DELETE CASCADE,
-    user_id INTEGER NOT NULL REFERENCES usr(user_id) ON DELETE CASCADE,
-    role_id INTEGER NOT NULL REFERENCES role(role_id) ON DELETE CASCADE,
+    tenant_id INTEGER NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES usr(id) ON DELETE CASCADE,
+    role_id INTEGER NOT NULL REFERENCES role(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (tenant_id, user_id, role_id)
 );

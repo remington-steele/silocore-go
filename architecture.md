@@ -38,6 +38,9 @@ This document outlines the architecture for a multi-tenant SAAS application usin
 - Data access layers will enforce tenant isolation by automatically applying tenant filters. This will be achieved by including the `tenant_id` in SQL queries to filter results at the database level, enhancing performance by leveraging PostgreSQL's query planner.
 - Admin-specific data access layers will bypass tenant filters for system-wide analytics and reporting by omitting the `tenant_id` in queries.
 
+## Logging
+- Implement detailed logging in all services and middleware.
+
 ## Views
 - templ will render server-side templates.
 - HTMX will handle dynamic interactions and partial page updates. The initial page will be rendered with templ, and subsequent interactions, such as form submissions and data updates, will be handled by Chi endpoints that return updated HTML fragments rendered by templ, which HTMX will use to update the view.
